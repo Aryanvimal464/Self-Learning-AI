@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seekhu: a self-learning maze agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF0F6; --panel:#FFFFFF; --ink:#1A1D3A; --muted:#5B6082; --line:#CDD2E4;
+  --good:#12957A; --bad:#D6336C; --agent:#F08A00; --accent:#3B3FD8; --on-accent:#FFFFFF;
+  --wall:#2B2F52; --cell:#F7F8FC; --track:#E3E6F2;
+  --display:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1120; --panel:#181B30; --ink:#E7E9FA; --muted:#9AA0C7; --line:#2E3354;
+    --good:#2FD1A8; --bad:#FF5C93; --agent:#FFB02E; --accent:#8C90FF; --on-accent:#0F1120;
+    --wall:#4A4F80; --cell:#1F2340; --track:#252A4B;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1120; --panel:#181B30; --ink:#E7E9FA; --muted:#9AA0C7; --line:#2E3354;
+  --good:#2FD1A8; --bad:#FF5C93; --agent:#FFB02E; --accent:#8C90FF; --on-accent:#0F1120;
+  --wall:#4A4F80; --cell:#1F2340; --track:#252A4B;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 20px 56px}
+header{max-width:640px;margin-bottom:24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(2.4rem,6vw,3.6rem);line-height:1;margin:0 0 12px;letter-spacing:-0.02em}
+header p{margin:0;color:var(--muted);font-size:1.05rem}
+.lab{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:900px){.lab{grid-template-columns:minmax(0,1fr)}}
+.stage,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.board{width:100%;display:flex;justify-content:center}
+canvas#grid{display:block;touch-action:none;border-radius:8px;cursor:crosshair;max-width:100%}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.tools .label{font-size:.9rem;color:var(--muted);margin-right:4px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:14px 0 0;font-size:.88rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--line)}
+button,select{font:inherit;color:var(--ink)}
+.btn{background:transparent;border:1px solid var(--line);border-radius:9px;padding:8px 13px;cursor:pointer;font-weight:500;transition:background .15s,border-color .15s}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600;padding:10px 20px}
+.btn.primary:hover{filter:brightness(1.08)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 16px}
+.stat{background:var(--bg);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-family:var(--display);font-size:1.5rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat small{color:var(--muted);font-size:.82rem}
+.bar{height:6px;background:var(--track);border-radius:3px;margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:var(--good);transform-origin:left;transform:scaleX(0)}
+.ctrl{margin:0 0 14px}
+.ctrl label{display:flex;justify-content:space-between;font-size:.92rem;margin-bottom:4px}
+.ctrl label span{color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+h2{font-family:var(--display);font-size:1rem;margin:18px 0 8px;font-weight:700}
+canvas#chart{display:block;width:100%;height:150px}
+.cap{font-size:.84rem;color:var(--muted);margin:0 0 6px}
+#note{min-height:1.4em;font-size:.9rem;color:var(--muted);margin:10px 0 0}
+.about{max-width:700px;margin-top:40px}
+.about h2{font-size:1.5rem;margin:0 0 10px}
+.about p{margin:0 0 14px}
+.about code{background:var(--track);padding:2px 7px;border-radius:6px;font-size:.92em}
+.formula{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Seekhu</h1>
+    <p>An agent that teaches itself to solve a maze. It starts with no map and no instructions, only rewards and penalties. Press Train and watch the arrows organise themselves.</p>
+  </header>
+
+  <div class="lab">
+    <section class="stage" aria-label="Maze">
+      <div class="board"><canvas id="grid" aria-label="Maze grid showing what the agent has learned"></canvas></div>
+      <div class="tools" role="group" aria-label="Draw tools">
+        <span class="label">Draw</span>
+        <button class="btn" data-tool="wall" aria-pressed="true">Wall</button>
+        <button class="btn" data-tool="pit" aria-pressed="false">Pit</button>
+        <button class="btn" data-tool="start" aria-pressed="false">Start</button>
+        <button class="btn" data-tool="goal" aria-pressed="false">Goal</button>
+        <button class="btn" data-tool="erase" aria-pressed="false">Erase</button>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--good);opacity:.7"></i>cells it expects to pay off</span>
+        <span><i class="sw" style="background:var(--bad);opacity:.7"></i>cells it learned to avoid</span>
+        <span><i class="sw" style="background:var(--agent)"></i>the agent</span>
+      </div>
+      <p id="note" role="status">Click or drag on the maze to change it. The agent restarts whenever you edit.</p>
+    </section>
+
+    <aside class="panel" aria-label="Controls">
+      <div class="row">
+        <button class="btn primary" id="train">Train</button>
+        <button class="btn" id="stepBtn">One step</button>
+        <button class="btn" id="reset">Reset brain</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><b id="sEp">0</b><small>episodes played</small></div>
+        <div class="stat"><b id="sEps">100%</b><small>exploring at random</small></div>
+        <div class="stat"><b id="sSucc">0%</b><small>reached goal (last 50)</small><div class="bar"><i id="succBar"></i></div></div>
+        <div class="stat"><b id="sRoute">none</b><small>best route length</small></div>
+      </div>
+
+      <div class="ctrl"><label for="speed">Speed <span id="vSpeed"></span></label><input id="speed" type="range" min="0" max="100" value="55"></div>
+      <div class="ctrl"><label for="alpha">Learning rate <span id="vAlpha"></span></label><input id="alpha" type="range" min="5" max="100" value="50"></div>
+      <div class="ctrl"><label for="gamma">Farsightedness <span id="vGamma"></span></label><input id="gamma" type="range" min="50" max="99" value="95"></div>
+      <div class="ctrl"><label for="decay">Curiosity fades after <span id="vDecay"></span></label><input id="decay" type="range" min="20" max="400" value="120"></div>
+
+      <div class="row">
+        <button class="btn" id="route" aria-pressed="false">Show learned route</button>
+      </div>
+
+      <h2>Reward per episode</h2>
+      <p class="cap">Average of the last 20 episodes. It should climb as the agent improves.</p>
+      <canvas id="chart" aria-label="Chart of average reward over episodes"></canvas>
+
+      <h2>Mazes</h2>
+      <select id="preset" aria-label="Choose a maze">
+        <option value="simple">Open field with a pit</option>
+        <option value="maze">Long winding maze</option>
+        <option value="cliff">Cliff edge: shortcut or safe route?</option>
+      </select>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="save">Save brain</button>
+        <button class="btn" id="load">Load brain</button>
+      </div>
+    </aside>
+  </div>
+
+  <section class="about">
+    <h2>How it learns</h2>
+    <p>This is <strong>Q-learning</strong>, a form of reinforcement learning. The agent keeps a table with one score for every cell and every move (up, right, down, left). The score answers one question: how good is this move from this cell in the long run?</p>
+    <p>It begins by moving at random. Reaching the goal gives +1, falling in a pit gives -1, and every step costs a tiny bit so it prefers short routes. After each move it nudges the score of that move towards what it just saw plus the best score available from the next cell:</p>
+    <p class="formula"><code>Q(s,a) &larr; Q(s,a) + α · ( reward + γ · max Q(s′,·) − Q(s,a) )</code></p>
+    <p>Good news travels backwards from the goal one cell at a time, which is why the green glow spreads from the goal towards the start. Early on it explores at random. As curiosity fades it follows its own arrows more and more. Try the cliff maze: with a high farsightedness it finds the safe route, and it is slower but never falls.</p>
+    <p>Edit the maze while it is learning, or change the sliders, to see what each setting does.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+var N = 10;
+var DIRS = [[0,-1],[1,0],[0,1],[-1,0]]; // up, right, down, left
+var PRESETS = {
+  simple: [
+    'S.........',
+    '..........',
+    '...##.....',
+    '...##.....',
+    '..........',
+    '.....PP...',
+    '..........',
+    '.##.......',
+    '..........',
+    '.........G'],
+  maze: [
+    'S.#.......',
+    '..#.####..',
+    '..#....#..',
+    '..####.#..',
+    '......#...',
+    '.####.#.##',
+    '.#....#...',
+    '.#.####.#.',
+    '.#......#G',
+    '.########.'],
+  cliff: [
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    'S.PPPPPPPG',
+    '..........']
+};
+
+var grid = new Uint8Array(N*N); // 0 empty, 1 wall, 2 pit
+var start = {x:0,y:0}, goal = {x:9,y:9};
+var Q = new Float32Array(N*N*4);
+var agent = {x:0,y:0}, epRet = 0, epSteps = 0;
+var eps = 1, episodes = 0;
+var hist = {ret:[], succ:[], steps:[], ma:[]};
+var training = false, acc = 0, showRoute = false, tool = 'wall';
+var MAX_STEPS = 200;
+
+var $ = function(id){return document.getElementById(id);};
+var canvas = $('grid'), ctx = canvas.getContext('2d');
+var chart = $('chart'), cg = chart.getContext('2d');
+var S = 0; // css size of grid canvas
+var colors = {};
+
+function idx(x,y){return y*N+x;}
+function rand(n){return Math.floor(Math.random()*n);}
+
+function loadPreset(name){
+  var rows = PRESETS[name];
+  for(var y=0;y<N;y++) for(var x=0;x<N;x++){
+    var ch = rows[y][x];
+    grid[idx(x,y)] = ch==='#' ? 1 : ch==='P' ? 2 : 0;
+    if(ch==='S') start = {x:x,y:y};
+    if(ch==='G') goal = {x:x,y:y};
+  }
+  resetBrain();
+}
+
+function resetBrain(){
+  Q.fill(0); eps = 1; episodes = 0; acc = 0;
+  hist = {ret:[], succ:[], steps:[], ma:[]};
+  agent = {x:start.x,y:start.y}; epRet = 0; epSteps = 0;
+  updateStats();
+}
+
+function bestAction(s, randomTie){
+  var b = -Infinity, ties = [];
+  for(var a=0;a<4;a++){
+    var q = Q[s*4+a];
+    if(q > b + 1e-9){b = q; ties = [a];}
+    else if(Math.abs(q-b) <= 1e-9){ties.push(a);}
+  }
+  return randomTie ? ties[rand(ties.length)] : ties[0];
+}
+function maxQ(s){
+  var m = -Infinity;
+  for(var a=0;a<4;a++) if(Q[s*4+a] > m) m = Q[s*4+a];
+  return m;
+}
+
+function step(){
+  var alpha = +$('alpha').value/100, gamma = +$('gamma').value/100;
+  var s = idx(agent.x,agent.y);
+  var a = Math.random() < eps ? rand(4) : bestAction(s,true);
+  var nx = agent.x + DIRS[a][0], ny = agent.y + DIRS[a][1];
+  var r = -0.02, done = false, success = false;
+  if(nx<0||ny<0||nx>=N||ny>=N||grid[idx(nx,ny)]===1){
+    nx = agent.x; ny = agent.y; r = -0.05;
+  } else if(grid[idx(nx,ny)]===2){
+    r = -1; done = true;
+  } else if(nx===goal.x && ny===goal.y){
+    r = 1; done = true; success = true;
+  }
+  var s2 = idx(nx,ny);
+  var target = r + (done ? 0 : gamma*maxQ(s2));
+  Q[s*4+a] += alpha*(target - Q[s*4+a]);
+  agent.x = nx; agent.y = ny; epRet += r; epSteps++;
+  if(done || epSteps >= MAX_STEPS) endEpisode(success);
+}
+
+function endEpisode(success){
+  episodes++;
+  hist.ret.push(epRet); hist.succ.push(success?1:0); hist.steps.push(epSteps);
+  var k = Math.min(20, hist.ret.length), sum = 0;
+  for(var i=hist.ret.length-k;i<hist.ret.length;i++) sum += hist.ret[i];
+  hist.ma.push(sum/k);
+  if(hist.ret.length > 1500){hist.ret.shift();hist.succ.shift();hist.steps.shift();}
+  if(hist.ma.length > 1500) hist.ma.shift();
+  var halfLife = +$('decay').value; // episodes to halve epsilon
+  eps = Math.max(0.03, eps*Math.pow(0.5, 1/halfLife));
+  agent = {x:start.x,y:start.y}; epRet = 0; epSteps = 0;
+  updateStats();
+}
+
+function computeRoute(){
+  var path = [{x:start.x,y:start.y}], seen = {}, x = start.x, y = start.y, reached = false;
+  seen[idx(x,y)] = true;
+  for(var i=0;i<80;i++){
+    var s = idx(x,y), q = Q[s*4], flat = true;
+    for(var a=1;a<4;a++) if(Math.abs(Q[s*4+a]-q)>1e-6) flat = false;
+    if(flat) break;
+    var d = DIRS[bestAction(s,false)];
+    var nx = x+d[0], ny = y+d[1];
+    if(nx<0||ny<0||nx>=N||ny>=N||grid[idx(nx,ny)]===1) break;
+    path.push({x:nx,y:ny});
+    if(grid[idx(nx,ny)]===2) break;
+    if(nx===goal.x && ny===goal.y){reached = true; break;}
+    if(seen[idx(nx,ny)]) break;
+    seen[idx(nx,ny)] = true; x = nx; y = ny;
+  }
+  return {path:path, reached:reached};
+}
+
+function updateStats(){
+  $('sEp').textContent = episodes;
+  $('sEps').textContent = Math.round(eps*100)+'%';
+  var n = Math.min(50, hist.succ.length), w = 0;
+  for(var i=hist.succ.length-n;i<hist.succ.length;i++) w += hist.succ[i];
+  var rate = n ? w/n : 0;
+  $('sSucc').textContent = Math.round(rate*100)+'%';
+  $('succBar').style.transform = 'scaleX('+rate+')';
+  var rt = computeRoute();
+  $('sRoute').textContent = rt.reached ? (rt.path.length-1)+' steps' : 'none';
+}
+
+function readColors(){
+  var cs = getComputedStyle(document.documentElement);
+  ['--good','--bad','--agent','--accent','--wall','--cell','--line','--ink','--muted','--panel'].forEach(function(k){
+    colors[k] = cs.getPropertyValue(k).trim();
+  });
+}
+function hexA(hex, a){
+  var h = hex.replace('#','');
+  if(h.length===3) h = h.split('').map(function(c){return c+c;}).join('');
+  var n = parseInt(h,16);
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+}
+
+function resize(){
+  var wrap = canvas.parentElement.getBoundingClientRect();
+  var size = Math.max(240, Math.floor(Math.min(wrap.width, 640)));
+  var dpr = window.devicePixelRatio || 1;
+  if(size !== S){
+    S = size;
+    canvas.style.width = S+'px'; canvas.style.height = S+'px';
+    canvas.width = Math.round(S*dpr); canvas.height = Math.round(S*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  var cw = chart.clientWidth, ch = chart.clientHeight;
+  if(cw && (chart.width !== Math.round(cw*dpr) || chart.height !== Math.round(ch*dpr))){
+    chart.width = Math.round(cw*dpr); chart.height = Math.round(ch*dpr);
+    cg.setTransform(dpr,0,0,dpr,0,0);
+  }
+}
+
+function arrow(cx, cy, d, len, color){
+  var dx = d[0], dy = d[1];
+  var x1 = cx - dx*len/2, y1 = cy - dy*len/2, x2 = cx + dx*len/2, y2 = cy + dy*len/2;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  var hs = len*0.3, px = -dy, py = dx;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2 - dx*hs + px*hs*0.7, y2 - dy*hs + py*hs*0.7);
+  ctx.lineTo(x2 - dx*hs - px*hs*0.7, y2 - dy*hs - py*hs*0.7);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawGrid(){
+  var cs = S/N, c = colors;
+  ctx.clearRect(0,0,S,S);
+  for(var y=0;y<N;y++) for(var x=0;x<N;x++){
+    var i = idx(x,y), px = x*cs, py = y*cs;
+    ctx.fillStyle = c['--cell']; ctx.fillRect(px,py,cs,cs);
+    var isGoal = x===goal.x && y===goal.y;
+    if(grid[i]===1){
+      ctx.fillStyle = c['--wall']; ctx.fillRect(px,py,cs,cs);
+      continue;
+    }
+    var m = maxQ(i), lo = Infinity;
+    for(var a=0;a<4;a++) if(Q[i*4+a] < lo) lo = Q[i*4+a];
+    if(!isGoal && grid[i]===0 && (m !== 0 || lo !== 0)){
+      var v = Math.max(-1, Math.min(1, m));
+      var col = v >= 0 ? c['--good'] : c['--bad'];
+      ctx.fillStyle = hexA(col, Math.min(0.75, Math.abs(v)*0.75)); ctx.fillRect(px,py,cs,cs);
+    }
+    if(grid[i]===2){
+      ctx.fillStyle = hexA(c['--bad'], 0.28); ctx.fillRect(px,py,cs,cs);
+      ctx.strokeStyle = c['--bad']; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      var pad = cs*0.28;
+      ctx.beginPath();
+      ctx.moveTo(px+pad,py+pad); ctx.lineTo(px+cs-pad,py+cs-pad);
+      ctx.moveTo(px+cs-pad,py+pad); ctx.lineTo(px+pad,py+cs-pad);
+      ctx.stroke();
+    } else if(!isGoal && (m - lo) > 1e-4){
+      arrow(px+cs/2, py+cs/2, DIRS[bestAction(i,false)], cs*0.42, hexA(c['--ink'], 0.8));
+    }
+  }
+  // grid lines
+  ctx.strokeStyle = c['--line']; ctx.lineWidth = 1; ctx.beginPath();
+  for(var k=0;k<=N;k++){
+    ctx.moveTo(Math.round(k*cs)+0.5,0); ctx.lineTo(Math.round(k*cs)+0.5,S);
+    ctx.moveTo(0,Math.round(k*cs)+0.5); ctx.lineTo(S,Math.round(k*cs)+0.5);
+  }
+  ctx.stroke();
+  // goal
+  var gx = goal.x*cs, gy = goal.y*cs;
+  ctx.fillStyle = c['--good']; ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(gx+cs*0.1,gy+cs*0.1,cs*0.8,cs*0.8,cs*0.18) : ctx.rect(gx+cs*0.1,gy+cs*0.1,cs*0.8,cs*0.8);
+  ctx.fill();
+  ctx.strokeStyle = c['--panel']; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(gx+cs/2, gy+cs/2, cs*0.2, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(gx+cs/2, gy+cs/2, cs*0.06, 0, Math.PI*2); ctx.fillStyle = c['--panel']; ctx.fill();
+  // start marker
+  ctx.strokeStyle = c['--accent']; ctx.lineWidth = 2.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.arc(start.x*cs+cs/2, start.y*cs+cs/2, cs*0.4, 0, Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+  // route overlay
+  if(showRoute){
+    var rt = computeRoute();
+    if(rt.path.length > 1){
+      ctx.strokeStyle = c['--accent']; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.85; ctx.beginPath();
+      rt.path.forEach(function(p,j){
+        var X = p.x*cs+cs/2, Y = p.y*cs+cs/2;
+        j ? ctx.lineTo(X,Y) : ctx.moveTo(X,Y);
+      });
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+  // agent
+  var ax = agent.x*cs+cs/2, ay = agent.y*cs+cs/2;
+  ctx.fillStyle = c['--agent']; ctx.strokeStyle = c['--ink']; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(ax,ay,cs*0.24,0,Math.PI*2); ctx.fill(); ctx.stroke();
+}
+
+function drawChart(){
+  var w = chart.clientWidth, h = chart.clientHeight;
+  if(!w || !h) return;
+  cg.clearRect(0,0,w,h);
+  var c = colors, data = hist.ma.slice(-400);
+  var padL = 34, padR = 8, padT = 8, padB = 18;
+  if(data.length < 2){
+    cg.fillStyle = c['--muted']; cg.font = '13px Figtree, system-ui, sans-serif';
+    cg.fillText('Chart appears after a few episodes.', padL, h/2);
+    return;
+  }
+  var lo = Math.min.apply(null,data), hi = Math.max.apply(null,data);
+  lo = Math.min(lo,0); hi = Math.max(hi,0.1);
+  var span = hi-lo, y = function(v){return padT + (1-(v-lo)/span)*(h-padT-padB);};
+  var x = function(i){return padL + i/(data.length-1)*(w-padL-padR);};
+  cg.strokeStyle = c['--line']; cg.lineWidth = 1; cg.beginPath();
+  cg.moveTo(padL,y(0)); cg.lineTo(w-padR,y(0)); cg.stroke();
+  cg.fillStyle = c['--muted']; cg.font = '11px Figtree, system-ui, sans-serif';
+  cg.fillText(hi.toFixed(1), 2, padT+8);
+  cg.fillText(lo.toFixed(1), 2, h-padB);
+  cg.fillText('0', 2, y(0)+4);
+  cg.fillText('episodes '+(episodes-data.length+1)+' to '+episodes, padL, h-3);
+  cg.beginPath();
+  data.forEach(function(v,i){i ? cg.lineTo(x(i),y(v)) : cg.moveTo(x(i),y(v));});
+  cg.lineTo(x(data.length-1),y(0)); cg.lineTo(x(0),y(0)); cg.closePath();
+  cg.fillStyle = hexA(c['--good'],0.18); cg.fill();
+  cg.beginPath();
+  data.forEach(function(v,i){i ? cg.lineTo(x(i),y(v)) : cg.moveTo(x(i),y(v));});
+  cg.strokeStyle = c['--good']; cg.lineWidth = 2; cg.lineJoin = 'round'; cg.stroke();
+}
+
+// --- loop ---
+function speedRate(){return 2*Math.pow(10, (+$('speed').value/100)*4);} // 2 .. 20000 steps/s
+var last = performance.now(), frameN = 0, lastEp = -1;
+function frame(t){
+  var dt = Math.min(0.1,(t-last)/1000); last = t;
+  if(training){
+    acc += dt*speedRate();
+    var n = Math.min(Math.floor(acc), 6000); acc -= Math.floor(acc);
+    while(n-- > 0) step();
+  }
+  if(frameN++ % 30 === 0) readColors();
+  if(episodes !== lastEp || frameN % 15 === 0){ // keep route/stats fresh while learning
+    if(training) updateStats();
+    lastEp = episodes;
+  }
+  drawGrid();
+  if(frameN % 3 === 0) drawChart();
+  requestAnimationFrame(frame);
+}
+
+// --- UI ---
+function note(msg){$('note').textContent = msg;}
+function syncLabels(){
+  $('vSpeed').textContent = Math.round(speedRate()).toLocaleString()+' steps/s';
+  $('vAlpha').textContent = (+$('alpha').value/100).toFixed(2);
+  $('vGamma').textContent = (+$('gamma').value/100).toFixed(2);
+  $('vDecay').textContent = $('decay').value+' episodes (half)';
+}
+['speed','alpha','gamma','decay'].forEach(function(id){$(id).addEventListener('input',syncLabels);});
+
+function setTraining(on){
+  training = on;
+  $('train').textContent = on ? 'Pause' : (episodes ? 'Resume' : 'Train');
+}
+$('train').addEventListener('click', function(){setTraining(!training);});
+$('stepBtn').addEventListener('click', function(){setTraining(false); step(); updateStats();});
+$('reset').addEventListener('click', function(){setTraining(false); resetBrain(); $('train').textContent='Train'; note('Brain wiped. The agent knows nothing again.');});
+$('route').addEventListener('click', function(){
+  showRoute = !showRoute;
+  this.setAttribute('aria-pressed', showRoute);
+  this.textContent = showRoute ? 'Hide learned route' : 'Show learned route';
+});
+$('preset').addEventListener('change', function(){
+  setTraining(false); loadPreset(this.value); $('train').textContent='Train';
+  note(this.value==='cliff' ? 'Cliff: the short path hugs the pits. Watch which one it chooses.' : 'Maze loaded. Press Train.');
+});
+Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function(b){
+  b.addEventListener('click', function(){
+    tool = b.getAttribute('data-tool');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function(o){
+      o.setAttribute('aria-pressed', o===b ? 'true' : 'false');
+    });
+  });
+});
+
+function paint(x,y){
+  if(x<0||y<0||x>=N||y>=N) return;
+  var i = idx(x,y), isS = x===start.x&&y===start.y, isG = x===goal.x&&y===goal.y, changed = false;
+  if(tool==='wall' && !isS && !isG && grid[i]!==1){grid[i]=1; changed=true;}
+  else if(tool==='pit' && !isS && !isG && grid[i]!==2){grid[i]=2; changed=true;}
+  else if(tool==='erase' && grid[i]!==0){grid[i]=0; changed=true;}
+  else if(tool==='start' && !isG && !isS){grid[i]=0; start={x:x,y:y}; changed=true;}
+  else if(tool==='goal' && !isS && !isG){grid[i]=0; goal={x:x,y:y}; changed=true;}
+  if(changed){resetBrain(); note('Maze changed, so the agent starts learning again.'); if(!training) $('train').textContent='Train';}
+}
+var painting = false;
+function cell(e){
+  var r = canvas.getBoundingClientRect();
+  return {x:Math.floor((e.clientX-r.left)/r.width*N), y:Math.floor((e.clientY-r.top)/r.height*N)};
+}
+canvas.addEventListener('pointerdown', function(e){
+  painting = true; try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+  var p = cell(e); paint(p.x,p.y);
+});
+canvas.addEventListener('pointermove', function(e){
+  if(!painting) return;
+  var p = cell(e); paint(p.x,p.y);
+});
+['pointerup','pointercancel'].forEach(function(ev){canvas.addEventListener(ev,function(){painting=false;});});
+
+$('save').addEventListener('click', function(){
+  try{
+    localStorage.setItem('seekhu-brain', JSON.stringify({
+      grid:Array.from(grid), start:start, goal:goal, Q:Array.from(Q), episodes:episodes, eps:eps, hist:hist
+    }));
+    note('Brain saved in this browser.');
+  }catch(e){ note('Saving is not available in this browser.'); }
+});
+$('load').addEventListener('click', function(){
+  try{
+    var raw = localStorage.getItem('seekhu-brain');
+    if(!raw){ note('No saved brain yet. Train, then press Save brain.'); return; }
+    var d = JSON.parse(raw);
+    grid = Uint8Array.from(d.grid); start = d.start; goal = d.goal;
+    Q = Float32Array.from(d.Q); episodes = d.episodes; eps = d.eps; hist = d.hist;
+    agent = {x:start.x,y:start.y}; epRet = 0; epSteps = 0;
+    setTraining(false); updateStats(); note('Saved brain loaded. Press Resume to keep training.');
+  }catch(e){ note('Could not load a saved brain.'); }
+});
+
+if(window.ResizeObserver){
+  new ResizeObserver(resize).observe(canvas.parentElement);
+  new ResizeObserver(resize).observe(chart);
+}
+window.addEventListener('resize', resize);
+if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+loadPreset('simple');
+syncLabels(); readColors(); resize();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
